@@ -1,0 +1,53 @@
+services:
+  wafaclub:
+    build: .
+    image: wafaclub:local
+    ports:
+      - "8501:8501"
+    environment:
+      WAFACLUB_ENV: development
+      WAFACLUB_AUTO_SEED: "true"
+      WAFACLUB_PAYMENTS_MODE: simulated
+      DATABASE_URL: sqlite:///data/wafaclub.db
+      WAFACLUB_APP_SECRET: ${WAFACLUB_APP_SECRET:-local-demo-only-not-a-production-secret}
+    volumes:
+      - wafaclub_data:/app/data
+    restart: unless-stopped
+
+  # Base PostgreSQL optionnelle : docker compose --profile postgres up
+  db:
+    image: postgres:16-alpine
+    profiles: ["postgres"]
+    environment:
+      POSTGRES_DB: wafaclub
+      POSTGRES_USER: wafaclub
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-wafaclub_dev_password}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U wafaclub -d wafaclub"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  wafaclub-postgres:
+    build: .
+    image: wafaclub:local
+    profiles: ["postgres"]
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8502:8501"
+    environment:
+      WAFACLUB_ENV: development
+      WAFACLUB_AUTO_SEED: "true"
+      WAFACLUB_PAYMENTS_MODE: simulated
+      DATABASE_URL: postgresql+psycopg://wafaclub:${POSTGRES_PASSWORD:-wafaclub_dev_password}@db:5432/wafaclub
+      WAFACLUB_APP_SECRET: ${WAFACLUB_APP_SECRET:-local-demo-only-not-a-production-secret}
+    restart: unless-stopped
+
+volumes:
+  wafaclub_data:
+  postgres_data:
